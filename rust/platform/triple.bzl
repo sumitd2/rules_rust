@@ -125,6 +125,10 @@ def _query_cpu_architecture(repository_ctx, expected_archs, is_windows = False):
         if "mac" in repository_ctx.os.name and arch == "arm64":
             arch = "aarch64"
 
+        # Correct the ppc64le architecture
+        if arch == "ppc64le":
+            arch = "powerpc64le"
+
     if not arch in expected_archs:
         fail("{} is not a expected cpu architecture {}\n{}".format(
             arch,
@@ -168,7 +172,7 @@ def get_host_triple(repository_ctx, abi = None):
     # Detect the host's cpu architecture
 
     supported_architectures = {
-        "linux": ["aarch64", "x86_64"],
+        "linux": ["aarch64", "x86_64", "powerpc64le"],
         "macos": ["aarch64", "x86_64"],
         "windows": ["aarch64", "x86_64"],
     }
