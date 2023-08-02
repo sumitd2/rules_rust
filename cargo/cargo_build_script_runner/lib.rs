@@ -192,7 +192,7 @@ impl BuildScriptOutput {
                 BuildScriptOutput::LinkArg(e) => compile_flags.push(format!("-Clink-arg={e}")),
                 BuildScriptOutput::LinkLib(e) => link_flags.push(format!("-l{e}")),
                 BuildScriptOutput::LinkSearch(e) => {
-                    link_search_paths.push(format!("-L{}/{e}", link_search_prefix))
+                    link_search_paths.push(format!("-L{e}"))
                 }
                 _ => {}
             }
