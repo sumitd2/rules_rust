@@ -304,7 +304,7 @@ cargo:rustc-env=no_trailing_newline=true",
                     "-Lblah\n--cfg=feature=awesome\n-Clink-arg=-weak_framework\n-Clink-arg=Metal"
                         .to_owned(),
                 link_flags: "-lsdfsdf".to_owned(),
-                link_search_paths: "-Lsome/relative/path/${pwd}/bleh".to_owned(),
+                link_search_paths: "-L${pwd}/bleh".to_owned(),
             }
         );
     }
