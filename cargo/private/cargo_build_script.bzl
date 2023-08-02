@@ -108,8 +108,8 @@ def _cargo_build_script_impl(ctx):
 
     env.update({
         "CARGO_CRATE_NAME": name_to_crate_name(pkg_name),
-        "CARGO_MANIFEST_DIR": manifest_dir,
         "CARGO_LINKSEARCH_PREFIX": link_search_prefix,
+        "CARGO_MANIFEST_DIR": manifest_dir,
         "CARGO_PKG_NAME": pkg_name,
         "HOST": toolchain.exec_triple.str,
         "NUM_JOBS": "1",
