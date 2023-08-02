@@ -296,11 +296,7 @@ cargo:rustc-env=no_trailing_newline=true",
             "FOO=BAR\nBAR=FOO\nSOME_PATH=${pwd}/beep\nno_trailing_newline=true".to_owned()
         );
         assert_eq!(
-            BuildScriptOutput::outputs_to_flags(
-                &result,
-                "/some/absolute/path",
-                ""
-            ),
+            BuildScriptOutput::outputs_to_flags(&result, "/some/absolute/path", ""),
             CompileAndLinkFlags {
                 // -Lblah was output as a rustc-flags, so even though it probably _should_ be a link
                 // flag, we don't treat it like one.
