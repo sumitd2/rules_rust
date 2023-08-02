@@ -191,7 +191,7 @@ impl BuildScriptOutput {
                 BuildScriptOutput::Flags(e) => compile_flags.push(e.to_owned()),
                 BuildScriptOutput::LinkArg(e) => compile_flags.push(format!("-Clink-arg={e}")),
                 BuildScriptOutput::LinkLib(e) => link_flags.push(format!("-l{e}")),
-                BuildScriptOutput::LinkSearch(e) => link_search_paths.push(format!("-L{e}")),
+                BuildScriptOutput::LinkSearch(e) => link_search_paths.push(if link_search_prefix.is_empty() { format!("-L{e}") } else { format!("-L{}/{e}", link_search_paths) }),
                 _ => {}
             }
         }
@@ -293,7 +293,7 @@ cargo:rustc-env=no_trailing_newline=true",
             BuildScriptOutput::outputs_to_flags(
                 &result,
                 "/some/absolute/path",
-                "some/relative/path"
+                ""
             ),
             CompileAndLinkFlags {
                 // -Lblah was output as a rustc-flags, so even though it probably _should_ be a link
