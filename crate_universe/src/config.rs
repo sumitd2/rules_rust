@@ -142,6 +142,14 @@ impl From<GitReference> for Commitish {
         }
     }
 }
+/// A value which may either be a plain String, or a dict of platform triples
+/// (or other cfg expressions understood by `crate::context::platforms::resolve_cfg_platforms`) to Strings.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(untagged)]
+pub enum StringOrSelect {
+    Value(String),
+    Select(BTreeMap<String, String>),
+}
 
 /// Information representing deterministic identifiers for some remote asset.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -161,7 +169,7 @@ pub enum Checksumish {
     },
 }
 
-#[derive(Debug, Default, Deserialize, Serialize, Clone)]
+#[derive(Debug, Default, Deserialize, Serialize, Clone, PartialEq)]
 pub struct CrateAnnotations {
     /// Which subset of the crate's bins should get produced as `rust_binary` targets.
     pub gen_binaries: Option<GenBinaries>,
@@ -234,7 +242,7 @@ pub struct CrateAnnotations {
 
     /// Additional environment variables to pass to a build script's
     /// [build_script_env](https://bazelbuild.github.io/rules_rust/cargo.html#cargo_build_script-rustc_env) attribute.
-    pub build_script_env: Option<BTreeMap<String, String>>,
+    pub build_script_env: Option<BTreeMap<String, StringOrSelect>>,
 
     /// Additional rustc_env flags to pass to a build script's
     /// [rustc_env](https://bazelbuild.github.io/rules_rust/cargo.html#cargo_build_script-rustc_env) attribute.
@@ -243,6 +251,9 @@ pub struct CrateAnnotations {
     /// Additional labels to pass to a build script's
     /// [toolchains](https://bazel.build/reference/be/common-definitions#common-attributes) attribute.
     pub build_script_toolchains: Option<BTreeSet<String>>,
+
+    /// Directory to run the crate's build script in. If not set, will run in the manifest directory, otherwise a directory relative to the exec root.
+    pub build_script_rundir: Option<String>,
 
     /// A scratch pad used to write arbitrary text to target BUILD files.
     pub additive_build_file_content: Option<String>,
@@ -317,6 +328,7 @@ impl Add for CrateAnnotations {
             build_script_env: joined_extra_member!(self.build_script_env, rhs.build_script_env, BTreeMap::new, BTreeMap::extend),
             build_script_rustc_env: joined_extra_member!(self.build_script_rustc_env, rhs.build_script_rustc_env, BTreeMap::new, BTreeMap::extend),
             build_script_toolchains: joined_extra_member!(self.build_script_toolchains, rhs.build_script_toolchains, BTreeSet::new, BTreeSet::extend),
+            build_script_rundir: self.build_script_rundir.or(rhs.build_script_rundir),
             additive_build_file_content: joined_extra_member!(self.additive_build_file_content, rhs.additive_build_file_content, String::new, concat_string),
             shallow_since: self.shallow_since.or(rhs.shallow_since),
             patch_args: joined_extra_member!(self.patch_args, rhs.patch_args, Vec::new, Vec::extend),
@@ -332,6 +344,92 @@ impl Add for CrateAnnotations {
 impl Sum for CrateAnnotations {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         iter.fold(CrateAnnotations::default(), |a, b| a + b)
+    }
+}
+
+/// A subset of `crate.annotation` that we allow packages to define in their
+/// free-form Cargo.toml metadata.
+///
+/// ```toml
+/// [package.metadata.bazel]
+/// additive_build_file_contents = """
+///     ...
+/// """
+/// data = ["font.woff2"]
+/// extra_aliased_targets = { ... }
+/// gen_build_script = false
+/// ```
+///
+/// These are considered default values which apply if the Bazel workspace does
+/// not specify a different value for the same annotation in their
+/// crates_repository attributes.
+#[derive(Debug, Deserialize)]
+pub struct AnnotationsProvidedByPackage {
+    pub gen_build_script: Option<bool>,
+    pub data: Option<BTreeSet<String>>,
+    pub data_glob: Option<BTreeSet<String>>,
+    pub compile_data: Option<BTreeSet<String>>,
+    pub compile_data_glob: Option<BTreeSet<String>>,
+    pub rustc_env: Option<BTreeMap<String, String>>,
+    pub rustc_env_files: Option<BTreeSet<String>>,
+    pub rustc_flags: Option<Vec<String>>,
+    pub build_script_env: Option<BTreeMap<String, StringOrSelect>>,
+    pub build_script_rustc_env: Option<BTreeMap<String, String>>,
+    pub build_script_rundir: Option<String>,
+    pub additive_build_file_content: Option<String>,
+    pub extra_aliased_targets: Option<BTreeMap<String, String>>,
+}
+
+impl CrateAnnotations {
+    pub fn apply_defaults_from_package_metadata(&mut self, pkg_metadata: &serde_json::Value) {
+        #[deny(unused_variables)]
+        let AnnotationsProvidedByPackage {
+            gen_build_script,
+            data,
+            data_glob,
+            compile_data,
+            compile_data_glob,
+            rustc_env,
+            rustc_env_files,
+            rustc_flags,
+            build_script_env,
+            build_script_rustc_env,
+            build_script_rundir,
+            additive_build_file_content,
+            extra_aliased_targets,
+        } = match AnnotationsProvidedByPackage::deserialize(&pkg_metadata["bazel"]) {
+            Ok(annotations) => annotations,
+            // Ignore bad annotations. The set of supported annotations evolves
+            // over time across different versions of crate_universe, and we
+            // don't want a library to be impossible to import into Bazel for
+            // having old or broken annotations. The Bazel workspace can specify
+            // its own correct annotations.
+            Err(_) => return,
+        };
+
+        fn default<T>(workspace_value: &mut Option<T>, default_value: Option<T>) {
+            if workspace_value.is_none() {
+                *workspace_value = default_value;
+            }
+        }
+
+        default(&mut self.gen_build_script, gen_build_script);
+        default(&mut self.gen_build_script, gen_build_script);
+        default(&mut self.data, data);
+        default(&mut self.data_glob, data_glob);
+        default(&mut self.compile_data, compile_data);
+        default(&mut self.compile_data_glob, compile_data_glob);
+        default(&mut self.rustc_env, rustc_env);
+        default(&mut self.rustc_env_files, rustc_env_files);
+        default(&mut self.rustc_flags, rustc_flags);
+        default(&mut self.build_script_env, build_script_env);
+        default(&mut self.build_script_rustc_env, build_script_rustc_env);
+        default(&mut self.build_script_rundir, build_script_rundir);
+        default(
+            &mut self.additive_build_file_content,
+            additive_build_file_content,
+        );
+        default(&mut self.extra_aliased_targets, extra_aliased_targets);
     }
 }
 
@@ -444,7 +542,7 @@ impl std::fmt::Display for CrateId {
     }
 }
 
-#[derive(Debug, Hash, Clone)]
+#[derive(Debug, Hash, Clone, PartialEq)]
 pub enum GenBinaries {
     All,
     Some(BTreeSet<String>),
