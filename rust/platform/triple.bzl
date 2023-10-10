@@ -74,9 +74,6 @@ def _validate_cpu_architecture(arch, expected_archs):
         arch (string): a CPU architecture
         expected_archs (list): A list of expected architecture strings
     """
-    # Correct the ppc64le architecture
-    if arch == "ppc64le":
-        arch = "powerpc64le"
 
     if arch not in expected_archs:
         fail("{} is not a expected cpu architecture {}".format(
@@ -126,6 +123,8 @@ def get_host_triple(repository_ctx, abi = None):
     arch = repository_ctx.os.arch
     if arch == "amd64":
         arch = "x86_64"
+    else if arch == "ppc64le":
+        arch = "powerpc64le"
 
     if "linux" in repository_ctx.os.name:
         _validate_cpu_architecture(arch, supported_architectures["linux"])
