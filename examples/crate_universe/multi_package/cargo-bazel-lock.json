@@ -1,5 +1,5 @@
 {
-  "checksum": "20725dee876118a06f07c103d682994d645bdd2ec1eb94deed0321f0af826e27",
+  "checksum": "933f3b50ddd3e6651dd0772efa2a8b3a9209ea79c7cc66ed9d82d5dc48be7c59",
   "crates": {
     "aho-corasick 0.7.20": {
       "name": "aho-corasick",
@@ -1584,9 +1584,12 @@
             ]
           }
         },
-        "extra_deps": [
-          "@m_pkgs__curl//:curl"
-        ],
+        "extra_deps": {
+          "common": [
+            "@m_pkgs__curl//:curl"
+          ],
+          "selects": {}
+        },
         "edition": "2018",
         "version": "0.4.60+curl-7.88.1"
       },
